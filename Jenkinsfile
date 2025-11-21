@@ -13,7 +13,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'main', url: 'https://github.com/NegzaouiOussama/Deveops.git'
+                git branch: 'main', url: 'https://github.com/EyaMosbahi/jenkins_repo.git'
             }
         }
         
