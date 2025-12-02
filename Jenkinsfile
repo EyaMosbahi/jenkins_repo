@@ -16,7 +16,7 @@ pipeline {
         
         // Variables SonarQube
         SONAR_PROJECT_KEY = "student-management"
-        SONAR_HOST_URL = "http://172.18.66.151:9000"
+        SONAR_HOST_URL = "http://localhost:9000"
         SONAR_TOKEN = "7faa9a738feeecb4b412ae19f6e32546625ae312"
     }
     
