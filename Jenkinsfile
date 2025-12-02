@@ -44,6 +44,7 @@ pipeline {
             }
         }
         
+        // 🆕 STAGE SONARQUBE ANALYSIS
         stage('SonarQube Analysis') {
             steps {
                 script {
