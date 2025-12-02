@@ -20,18 +20,18 @@ public class StudentControllerTest {
     private TestRestTemplate restTemplate;
 
     @Test
-    public void testApplicationStarts() {
+    void testApplicationStarts() {
         assertThat(restTemplate).isNotNull();
     }
 
     @Test
-    public void testGetAllStudents() {
+    void testGetAllStudents() {
         String response = restTemplate.getForObject("http://localhost:" + port + "/api/students", String.class);
         assertThat(response).isNotNull();
     }
 
     @Test
-    public void testStudentEndpointExists() {
+    void testStudentEndpointExists() {
         String response = restTemplate.getForObject("http://localhost:" + port + "/api/students", String.class);
         assertThat(response).isNotNull();
     }
