@@ -4,33 +4,35 @@ pipeline {
     environment {
         DOCKER_SPRING_IMAGE = "eyamosbahi/student-management"
         DOCKER_ANGULAR_IMAGE = "eyamosbahi/student-frontend"
+        DOCKER_GRAFANA_IMAGE = "grafana/grafana"
+        DOCKER_PROMETHEUS_IMAGE = "prom/prometheus"
         DOCKER_TAG = "1.0.${BUILD_NUMBER}"
         DOCKER_CREDENTIALS_ID = "dockerhub-credentials"
         SONAR_PROJECT_KEY = "student-management"
         SONAR_HOST_URL = "http://localhost:9000"
-        // Le token SonarQube sera injecté via credentials
     }
 
     stages {
+        ///////////////////////////////////////
+        // SPRING BOOT BACKEND
+        ///////////////////////////////////////
         stage('Checkout Spring Boot') {
             steps {
-                echo '✅ Spring Boot code already in workspace'
+                // Si déjà en workspace, adapte en fonction de ton multibranch.
+                echo '✅ Code Spring Boot déjà dans le workspace'
             }
         }
-
         stage('Compile Spring Boot') {
             steps {
                 sh 'mvn clean compile'
             }
         }
-
         stage('Test Spring Boot') {
             steps {
                 sh 'mvn test'
                 junit '**/target/surefire-reports/*.xml'
             }
         }
-
         stage('SonarQube Analysis') {
             steps {
                 withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
@@ -45,20 +47,17 @@ pipeline {
                 }
             }
         }
-
         stage('Package Spring Boot') {
             steps {
                 sh 'mvn package -DskipTests'
             }
         }
-
         stage('Docker Build Spring Boot') {
             steps {
                 sh "docker build -t ${DOCKER_SPRING_IMAGE}:${DOCKER_TAG} ."
                 sh "docker tag ${DOCKER_SPRING_IMAGE}:${DOCKER_TAG} ${DOCKER_SPRING_IMAGE}:latest"
             }
         }
-
         stage('Docker Push Spring Boot') {
             steps {
                 withCredentials([usernamePassword(
@@ -71,7 +70,6 @@ pipeline {
                 }
             }
         }
-
         stage('Deploy Spring Boot to Kubernetes') {
             steps {
                 sh """
@@ -82,25 +80,26 @@ pipeline {
             }
         }
 
+        ///////////////////////////////////////
+        // ANGULAR FRONTEND
+        ///////////////////////////////////////
         stage('Checkout Angular') {
             steps {
-                echo '✅ Angular code already in workspace or directory'
-                // Si besoin : checkout repo du frontend ici !
+                echo '✅ Code Angular déjà dans le workspace / copie manuelle'
+                // Si besoin, utiliser git checkout ou dir('...') pour localiser le frontend
             }
         }
-
-        stage('Build Angular Docker Image') {
+        stage('Docker Build Angular') {
             steps {
                 script {
-                    dir('/mnt/c/Users/ahmed/student-frontend') { // adapte ce chemin selon ton workspace
+                    dir('/mnt/c/Users/ahmed/student-frontend') {
                         sh "docker build -t ${DOCKER_ANGULAR_IMAGE}:${DOCKER_TAG} ."
                         sh "docker tag ${DOCKER_ANGULAR_IMAGE}:${DOCKER_TAG} ${DOCKER_ANGULAR_IMAGE}:latest"
                     }
                 }
             }
         }
-
-        stage('Push Angular Docker Image') {
+        stage('Docker Push Angular') {
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: "${DOCKER_CREDENTIALS_ID}", 
@@ -112,7 +111,6 @@ pipeline {
                 }
             }
         }
-
         stage('Deploy Angular to Kubernetes') {
             steps {
                 sh """
@@ -123,6 +121,35 @@ pipeline {
             }
         }
 
+        ///////////////////////////////////////
+        // GRAFANA (généralement image officielle)
+        ///////////////////////////////////////
+        stage('Deploy Grafana to Kubernetes') {
+            steps {
+                sh """
+                    # Si tu veux forcer un redeploiement sur nouvelle version officielle :
+                    kubectl set image deployment/grafana grafana=${DOCKER_GRAFANA_IMAGE}:latest -n devops
+                    kubectl rollout status deployment/grafana -n devops --timeout=5m
+                """
+            }
+        }
+
+        ///////////////////////////////////////
+        // PROMETHEUS (généralement image officielle)
+        ///////////////////////////////////////
+        stage('Deploy Prometheus to Kubernetes') {
+            steps {
+                sh """
+                    # Idem, pour redéployer une version officielle 
+                    kubectl set image deployment/prometheus prometheus=${DOCKER_PROMETHEUS_IMAGE}:latest -n devops
+                    kubectl rollout status deployment/prometheus -n devops --timeout=5m
+                """
+            }
+        }
+
+        ///////////////////////////////////////
+        // VERIFICATION GLOBALE
+        ///////////////////////////////////////
         stage('Verify Deployment') {
             steps {
                 sh '''
@@ -137,7 +164,7 @@ pipeline {
 
     post {
         success {
-            echo '✅ Pipeline complet réussi !'
+            echo '✅ Pipeline complet réussi !'
             echo "Spring Boot: ${DOCKER_SPRING_IMAGE}:${DOCKER_TAG}"
             echo "Angular: ${DOCKER_ANGULAR_IMAGE}:${DOCKER_TAG}"
         }
