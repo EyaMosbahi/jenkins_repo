@@ -2,7 +2,8 @@ pipeline {
     agent any
     
     environment {
-        DOCKER_IMAGE = "eyamosbahi/student-management"
+        DOCKER_SPRING_IMAGE = "eyamosbahi/student-management"
+        DOCKER_ANGULAR_IMAGE = "eyamosbahi/student-frontend"
         DOCKER_TAG = "1.0.${BUILD_NUMBER}"
         DOCKER_CREDENTIALS_ID = "dockerhub-credentials"
         SONAR_PROJECT_KEY = "student-management"
@@ -49,36 +50,87 @@ pipeline {
             }
         }
         
-        stage('Docker Build') {
+        stage('Docker Build Spring Boot') {
             steps {
                 script {
-                    sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} ."
-                    sh "docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_IMAGE}:latest"
+                    sh "docker build -t ${DOCKER_SPRING_IMAGE}:${DOCKER_TAG} ."
+                    sh "docker tag ${DOCKER_SPRING_IMAGE}:${DOCKER_TAG} ${DOCKER_SPRING_IMAGE}:latest"
                 }
             }
         }
         
-        stage('Docker Push') {
+        stage('Docker Push Spring Boot') {
             steps {
                 script {
                     withCredentials([usernamePassword(credentialsId: "${DOCKER_CREDENTIALS_ID}", 
                                                      usernameVariable: 'DOCKER_USER', 
                                                      passwordVariable: 'DOCKER_PASS')]) {
                         sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
-                        sh "docker push ${DOCKER_IMAGE}:${DOCKER_TAG}"
-                        sh "docker push ${DOCKER_IMAGE}:latest"
+                        sh "docker push ${DOCKER_SPRING_IMAGE}:${DOCKER_TAG}"
+                        sh "docker push ${DOCKER_SPRING_IMAGE}:latest"
                     }
                 }
             }
         }
         
-        stage('Deploy to Kubernetes') {
+        stage('Deploy Spring Boot to Kubernetes') {
             steps {
                 script {
                     sh """
-                        kubectl set image deployment/spring-app spring-app=${DOCKER_IMAGE}:${DOCKER_TAG} -n devops
-                        kubectl rollout status deployment/spring-app -n devops
+                        minikube image load ${DOCKER_SPRING_IMAGE}:${DOCKER_TAG}
+                        kubectl set image deployment/spring-app spring-app=${DOCKER_SPRING_IMAGE}:${DOCKER_TAG} -n devops
+                        kubectl rollout status deployment/spring-app -n devops --timeout=5m
+                    """
+                }
+            }
+        }
+        
+        stage('Docker Build Angular') {
+            steps {
+                script {
+                    dir('/mnt/c/Users/ahmed/student-frontend') {
+                        sh "docker build -t ${DOCKER_ANGULAR_IMAGE}:${DOCKER_TAG} ."
+                        sh "docker tag ${DOCKER_ANGULAR_IMAGE}:${DOCKER_TAG} ${DOCKER_ANGULAR_IMAGE}:latest"
+                    }
+                }
+            }
+        }
+        
+        stage('Docker Push Angular') {
+            steps {
+                script {
+                    withCredentials([usernamePassword(credentialsId: "${DOCKER_CREDENTIALS_ID}", 
+                                                     usernameVariable: 'DOCKER_USER', 
+                                                     passwordVariable: 'DOCKER_PASS')]) {
+                        sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
+                        sh "docker push ${DOCKER_ANGULAR_IMAGE}:${DOCKER_TAG}"
+                        sh "docker push ${DOCKER_ANGULAR_IMAGE}:latest"
+                    }
+                }
+            }
+        }
+        
+        stage('Deploy Angular to Kubernetes') {
+            steps {
+                script {
+                    sh """
+                        minikube image load ${DOCKER_ANGULAR_IMAGE}:${DOCKER_TAG}
+                        kubectl set image deployment/angular-app angular-app=${DOCKER_ANGULAR_IMAGE}:${DOCKER_TAG} -n devops
+                        kubectl rollout status deployment/angular-app -n devops --timeout=5m
+                    """
+                }
+            }
+        }
+        
+        stage('Verify Deployment') {
+            steps {
+                script {
+                    sh """
+                        echo "=== Pods Status ==="
                         kubectl get pods -n devops
+                        echo ""
+                        echo "=== Services ==="
+                        kubectl get svc -n devops
                     """
                 }
             }
@@ -87,10 +139,12 @@ pipeline {
     
     post {
         success {
-            echo '✅ Pipeline réussi ! Application déployée sur Kubernetes !'
+            echo '✅ Pipeline completed successfully!'
+            echo "Spring Boot: ${DOCKER_SPRING_IMAGE}:${DOCKER_TAG}"
+            echo "Angular: ${DOCKER_ANGULAR_IMAGE}:${DOCKER_TAG}"
         }
         failure {
-            echo '❌ Pipeline échoué !'
+            echo '❌ Pipeline failed!'
         }
     }
 }
