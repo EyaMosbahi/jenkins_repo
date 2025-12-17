@@ -11,11 +11,11 @@ pipeline {
         SONAR_TOKEN = "7faa9a738feeecb4b412ae19f6e32546625ae312"
     }
     
-    stages {
-        stage('Checkout') {
-            steps {
-                git branch: 'main', url: 'https://github.com/EyaMosbahi/jenkins_repo.git'
-            }
+   stage('Checkout') {
+    steps {
+        echo '✅ Code already in workspace'
+    }
+}
         }
         
         stage('Compile') {
